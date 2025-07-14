@@ -3,7 +3,7 @@ import shutil
 import sys
 
 from copystatic import *
-from gencontent import generate_page, generate_pages_recursive
+from gencontent import generate_pages_recursive
 
 dir_path_static = "./static"
 dir_path_public = "./docs"
