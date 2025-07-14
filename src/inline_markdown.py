@@ -1,44 +1,96 @@
 from textnode import *
 import re
 
-def split_node_delimiter(olds_nodes, delimiter, text_type):
-    new_nodes = []
-    for node in olds_nodes:
-        if node.text_type != TextType.PLAIN:
-            new_nodes.append(node)
-            continue
-        split_text = node.text.split(delimiter, maxsplit=2)
-        # If the delimiter is not valid raise error
-        if len(split_text) % 2 == 0:
-            raise ValueError("invalid markdown, formatted section not closed")
-        delimiter_text = split_text[1]
-        plain_text = split_text[0]
-        # If there is text add it to the list
-        if len(plain_text) != 0:
-            plain_node = TextNode(plain_text, TextType.PLAIN)
-            new_nodes.append(plain_node)
-        delimiter_node = TextNode(delimiter_text, text_type)
-        new_nodes.append(delimiter_node)
+def text_to_textnodes(text):
+    nodes = [TextNode(text, TextType.PLAIN)]
+    nodes = split_node_delimiter(nodes, "**", TextType.BOLD)
+    nodes = split_node_delimiter(nodes, "_", TextType.ITALIC)
+    nodes = split_node_delimiter(nodes, "`", TextType.CODE)
+    nodes = split_nodes_image(nodes)
+    nodes = split_nodes_link(nodes)
+    return nodes
 
-        # If there are more delimiters in the text handle them
-        if delimiter in split_text[2]:
-            unexpected_node = [TextNode(split_text[2], TextType.PLAIN)]
-            other_node = split_node_delimiter(unexpected_node, delimiter, text_type)
-            new_nodes.extend(other_node)
-        else:
-            if len(split_text[2]) != 0:
-                other_node = TextNode(split_text[2], TextType.PLAIN)
-                new_nodes.append(other_node)
+def split_node_delimiter(old_nodes, delimiter, text_type):
+    new_nodes = []
+    for old_node in old_nodes:
+        if old_node.text_type != TextType.PLAIN:
+            new_nodes.append(old_node)
+            continue
+        split_nodes = []
+        sections = old_node.text.split(delimiter)
+        if len(sections) % 2 == 0:
+            raise ValueError("invalid markdown, formatted section not closed")
+        for i in range(len(sections)):
+            if sections[i] == "":
+                continue
+            if i % 2 == 0:
+                split_nodes.append(TextNode(sections[i], TextType.PLAIN))
+            else:
+                split_nodes.append(TextNode(sections[i], text_type))
+        new_nodes.extend(split_nodes)
     return new_nodes
 
 def extract_markdown_images(text):
-    return re.findall(r"!\[([^\[\]]*)\]\(([^\(\)]*)\)", text)
+    pattern = r"!\[([^\[\]]*)\]\(([^\(\)]*)\)"
+    matches = re.findall(pattern, text)
+    return matches
+
 
 def extract_markdown_links(text):
-    return re.findall(r"(?<!!)\[([^\[\]]*)\]\(([^\(\)]*)\)", text)
+    pattern = r"(?<!!)\[([^\[\]]*)\]\(([^\(\)]*)\)"
+    matches = re.findall(pattern, text)
+    return matches
 
 def split_nodes_image(old_nodes):
     new_nodes = []
+    for old_node in old_nodes:
+        if old_node.text_type != TextType.PLAIN:
+            new_nodes.append(old_node)
+            continue
+        original_text = old_node.text
+        images = extract_markdown_images(original_text)
+        if len(images) == 0:
+            new_nodes.append(old_node)
+            continue
+        for image in images:
+            sections = original_text.split(f"![{image[0]}]({image[1]})", 1)
+            if len(sections) != 2:
+                raise ValueError("invalid markdown, image section not closed")
+            if sections[0] != "":
+                new_nodes.append(TextNode(sections[0], TextType.PLAIN))
+            new_nodes.append(
+                TextNode(
+                    image[0],
+                    TextType.IMAGE,
+                    image[1],
+                )
+            )
+            original_text = sections[1]
+        if original_text != "":
+            new_nodes.append(TextNode(original_text, TextType.PLAIN))
+    return new_nodes
+
 
 def split_nodes_link(old_nodes):
     new_nodes = []
+    for old_node in old_nodes:
+        if old_node.text_type != TextType.PLAIN:
+            new_nodes.append(old_node)
+            continue
+        original_text = old_node.text
+        links = extract_markdown_links(original_text)
+        if len(links) == 0:
+            new_nodes.append(old_node)
+            continue
+        for link in links:
+            sections = original_text.split(f"[{link[0]}]({link[1]})", 1)
+            if len(sections) != 2:
+                raise ValueError("invalid markdown, link section not closed")
+            if sections[0] != "":
+                new_nodes.append(TextNode(sections[0], TextType.PLAIN))
+            new_nodes.append(TextNode(link[0], TextType.LINK, link[1]))
+            original_text = sections[1]
+        if original_text != "":
+            new_nodes.append(TextNode(original_text, TextType.PLAIN))
+    return new_nodes
+
