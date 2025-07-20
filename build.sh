@@ -1,1 +1,1 @@
-python3 src/main.py "/https://github.com/Mavaboan1/static-web-gen/"
+python3 src/main.py "/https://github.com/Mavaboan1/static-web-gen/docs/"
